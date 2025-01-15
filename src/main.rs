@@ -29,7 +29,6 @@ pub struct HistoryQueryParams {
     pub user_to: String,
 }
 
-
 pub type Users = Arc<Mutex<Vec<mpsc::UnboundedSender<Result<Message, warp::Error>>>>>;
 
 

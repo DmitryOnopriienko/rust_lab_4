@@ -1,8 +1,9 @@
-const apiUrl = 'http://localhost:3030';
 let socket;
 let currentUser = '';
 
-document.addEventListener('DOMContentLoaded', () => fetchUsers());
+document.addEventListener('DOMContentLoaded', (event) => {
+    fetchUsers();
+});
 
 const toggleForm = () => {
     const loginForm = document.getElementById('login-form');
@@ -12,54 +13,46 @@ const toggleForm = () => {
     registerForm.style.display = registerForm.style.display === 'none' ? 'block' : 'none';
 };
 
-const handleAuthResponse = (response, successMessage, successCallback) => {
-    response.json().then(result => {
-        if (result === successMessage) {
-            alert(successMessage);
-            successCallback();
-        } else {
-            alert(result);
-        }
-    });
-};
-
-
-const authFetch = async (endpoint, data, successMessage, successCallback) => {
-    try {
-        const response = await fetch(`${apiUrl}/${endpoint}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(data)
-        });
-        handleAuthResponse(response, successMessage, successCallback);
-    } catch (error) {
-        console.error(`Error during ${endpoint}:`, error);
-        alert('A network error occurred.');
-    }
-};
-
-
-
-const login = () => {
+const login = async () => {
     const username = document.getElementById('login-username').value;
     const password = document.getElementById('login-password').value;
 
-    authFetch('login', { username, password }, 'Login successful', () => {
+    const response = await fetch('http://localhost:3030/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
+    });
+
+    const result = await response.json();
+
+    if (result === "Login successful") {
         currentUser = username;
         document.getElementById('current-user').textContent = username;
         showChat();
-        establishWebSocketConnection();
-    });
+        connectWebSocket();
+    } else {
+        alert(result);
+    }
 };
 
-const register = () => {
+const register = async () => {
     const username = document.getElementById('register-username').value;
     const password = document.getElementById('register-password').value;
 
-    authFetch('register', { username, password }, 'Registration successful', () => {
-        toggleForm();
-        alert('You can now log in!');
+    const response = await fetch('http://localhost:3030/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username, password })
     });
+
+    const result = await response.json();
+
+    if (result === 'Registration successful') {
+        alert('You can now log in!');
+        toggleForm();
+    } else {
+        alert(result);
+    }
 };
 
 const showChat = () => {
@@ -69,24 +62,47 @@ const showChat = () => {
 };
 
 const fetchUsers = () => {
-    fetch(`${apiUrl}/users`)
+    fetch('http://localhost:3030/users')
         .then(response => response.json())
         .then(users => {
             const usersList = document.getElementById('users');
             usersList.innerHTML = '';
-            users.filter(user => user !== currentUser)
-                .forEach(user => {
+            users.forEach(user => {
+                if (user !== currentUser) {
                     const userItem = document.createElement('li');
                     userItem.textContent = user;
                     userItem.onclick = () => selectUser(user);
                     usersList.appendChild(userItem);
-                });
-        })
-        .catch(error => console.error('Error fetching users:', error));
+                }
+            });
+        });
 };
 
-const displayMessages = (messages, containerId = 'messages') => {
-    const messagesDiv = document.getElementById(containerId);
+const fetchChatHistory = async (userFrom, userTo) => {
+    try {
+        const url = new URL('http://localhost:3030/history');
+        const params = { user_from: userFrom, user_to: userTo };
+
+        Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
+
+        const response = await fetch(url, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+        });
+
+        if (response.ok) {
+            const messages = await response.json();
+            displayChatHistory(messages);
+        } else {
+            console.error('Failed to fetch chat history');
+        }
+    } catch (error) {
+        console.error('Error fetching chat history:', error);
+    }
+};
+
+const displayChatHistory = (messages) => {
+    const messagesDiv = document.getElementById('messages');
     messagesDiv.innerHTML = '';
 
     messages.forEach((message) => {
@@ -96,62 +112,49 @@ const displayMessages = (messages, containerId = 'messages') => {
     });
 };
 
-const fetchChatHistory = async (userFrom, userTo) => {
-    try {
-        const url = new URL(`${apiUrl}/history`);
-        url.searchParams.append('user_from', userFrom);
-        url.searchParams.append('user_to', userTo);
-
-        const response = await fetch(url);
-        if (!response.ok) {
-            throw new Error(`HTTP error fetching history: ${response.status}`);
-        }
-        const messages = await response.json();
-        displayMessages(messages);
-
-    } catch (error) {
-        console.error('Error fetching/displaying chat history:', error);
-        displayMessages([]);
-    }
-};
-
 const selectUser = (user) => {
     document.getElementById('chat-with').textContent = user;
     fetchChatHistory(currentUser, user);
 };
 
-socket.onmessage = (event) => {
-    const message = JSON.parse(event.data);
-    if (message.sender === currentUser || message.receiver === currentUser) {
-        displayMessages([message], 'messages', false);
-    }
-};
-
-
-const establishWebSocketConnection = () => {
+const connectWebSocket = () => {
     const socketUrl = `ws://localhost:3030/chat`;
     socket = new WebSocket(socketUrl);
-
-    socket.onopen = () => console.log('WebSocket connected');
+    console.log(encodeURIComponent(currentUser));
+    socket.onopen = () => {
+        console.log('WebSocket connected');
+    };
 
     socket.onmessage = (event) => {
         const message = JSON.parse(event.data);
         if (message.sender === currentUser || message.receiver === currentUser) {
-            displayMessages([message]);
+            displayMessage(message);
         }
     };
 
-    socket.onclose = () => console.log('WebSocket closed');
-    socket.onerror = (error) => console.error('WebSocket error:', error);
+    socket.onclose = () => {
+        console.log('WebSocket closed');
+    };
+};
+
+const displayMessage = (message) => {
+    const messagesDiv = document.getElementById('messages');
+    const messageDiv = document.createElement('div');
+    messageDiv.textContent = `${message.sender}: ${message.message}`;
+    messagesDiv.appendChild(messageDiv);
 };
 
 const sendMessage = () => {
     const messageInput = document.getElementById('message-input');
     const message = messageInput.value;
-    const receiver = document.getElementById('chat-with').textContent;
 
-    if (message && socket.readyState === WebSocket.OPEN && receiver) {
-        const messagePayload = { sender: currentUser, receiver, message };
+    if (message && socket.readyState === WebSocket.OPEN) {
+        const messagePayload = {
+            sender: currentUser,
+            receiver: document.getElementById('chat-with').textContent,
+            message
+        };
+        console.log(JSON.stringify(messagePayload));
         socket.send(JSON.stringify(messagePayload));
         messageInput.value = '';
     }
