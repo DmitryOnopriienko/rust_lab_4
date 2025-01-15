@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KRustyChat</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div id="login-register" class="auth-container">
+        <div id="login-form" class="auth-form">
+            <h2>Login</h2>
+            <input type="text" id="login-username" placeholder="Username" />
+            <input type="password" id="login-password" placeholder="Password" />
+            <button onclick="login()">Login</button>
+            <p>Don't have an account? <a href="javascript:void(0);" onclick="toggleForm()">Register</a></p>
+        </div>
+
+        <div id="register-form" class="auth-form" style="display: none;">
+            <h2>Register</h2>
+            <input type="text" id="register-username" placeholder="Username" />
+            <input type="password" id="register-password" placeholder="Password" />
+            <button onclick="register()">Register</button>
+            <p>Have an account? <a href="javascript:void(0);" onclick="toggleForm()">Log in</a></p>
+        </div>
+    </div>
+
+    <div id="chat-container" class="chat-container" style="display: none;">
+        <div id="user-list" class="user-list">
+            <h3>Chats</h3>
+            <ul id="users"></ul>
+        </div>
+
+        <div id="chat-window" class="chat-window">
+            <h3>Logged in as: <span id="current-user"></span></h3>
+            <h3><span id="chat-with"></span></h3>
+            <div id="messages" class="messages"></div>
+            <input type="text" id="message-input" placeholder="Type a message..." />
+            <button onclick="sendMessage()">Send</button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>
